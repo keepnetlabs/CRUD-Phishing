@@ -1,0 +1,209 @@
+import { submitPhishing } from './services/submitPhishing.js';
+import { sendPhishing } from './services/sendPhishing.js';
+
+/**
+ * Cloudflare Worker - Phishing Campaign Management Endpoints
+ *
+ * POST /submit - Create and submit phishing email template, landing page, and scenario
+ * {
+ *   "accessToken": "JWT token",
+ *   "url": "API base URL",
+ *   "baseUrl": "Frontend base URL",
+ *   "phishingData": {
+ *     "name": "Campaign name",
+ *     "description": "Campaign description",
+ *     "landingPage": {
+ *       "name": "Landing page name",
+ *       "description": "Landing page description",
+ *       "method": "Data-Submission" or "Click-Only",
+ *       "difficulty": "Easy", "Medium", "Hard",
+ *       "language": "en",
+ *       "pages": [...]
+ *     }
+ *   }
+ * }
+ *
+ * POST /send - Send phishing scenario to target user
+ * {
+ *   "accessToken": "JWT token",
+ *   "url": "API base URL",
+ *   "scenarioResourceId": "Phishing scenario resource ID",
+ *   "targetUserResourceId": "Target user resource ID",
+ *   "name": "Campaign name"
+ * }
+ *
+ * ALL LOGIC in services/ directory!
+ */
+
+export default {
+  async fetch(request) {
+    // Only accept POST requests
+    if (request.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        {
+          status: 405,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Determine route from URL
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    console.log('=== PHISHING WORKER REQUEST ===');
+    console.log('Path:', path);
+
+    try {
+      // SUBMIT action - Create phishing email template, landing page, and scenario
+      if (path === '/submit' || path === '/') {
+        return await handleSubmit(request);
+      }
+
+      // SEND action - Send phishing scenario to target user
+      if (path === '/send') {
+        return await handleSend(request);
+      }
+
+      // Unknown path
+      return new Response(
+        JSON.stringify({
+          error: 'Not found',
+          availableEndpoints: ['/submit', '/send']
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+    } catch (error) {
+      console.error('=== PHISHING WORKER ERROR ===', error);
+      return new Response(
+        JSON.stringify({
+          error: error.message || 'Unknown error occurred'
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  }
+};
+
+// ===== ROUTE HANDLERS =====
+
+async function handleSubmit(request) {
+  try {
+    const body = await request.json();
+    const { accessToken, url, baseUrl, phishingData } = body;
+
+    // Validate required fields
+    if (!accessToken || !url || !phishingData) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields',
+          required: ['accessToken', 'url', 'phishingData']
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('=== PHISHING SUBMIT ACTION ===');
+    console.log('Campaign name:', phishingData.name);
+
+    // Call submitPhishing() function
+    const result = await submitPhishing({
+      accessToken,
+      url,
+      baseUrl,
+      phishingData
+    });
+
+    console.log('=== PHISHING SUBMIT SUCCESS ===');
+    console.log('Scenario ID:', result.scenarioId);
+
+    return new Response(
+      JSON.stringify(result),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('=== PHISHING SUBMIT ERROR ===', error);
+    return new Response(
+      JSON.stringify({
+        error: error.message || 'Submit failed'
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+}
+
+async function handleSend(request) {
+  try {
+    const body = await request.json();
+    const { accessToken, url, scenarioResourceId, targetUserResourceId, name } = body;
+
+    // Validate required fields
+    if (!accessToken || !url || !scenarioResourceId || !targetUserResourceId || !name) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields',
+          required: ['accessToken', 'url', 'scenarioResourceId', 'targetUserResourceId', 'name']
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('=== PHISHING SEND ACTION ===');
+    console.log('Scenario Resource ID:', scenarioResourceId);
+    console.log('Target User Resource ID:', targetUserResourceId);
+    console.log('Campaign name:', name);
+
+    // Call sendPhishing() function
+    const result = await sendPhishing({
+      accessToken,
+      url,
+      scenarioResourceId,
+      targetUserResourceId,
+      name
+    });
+
+    console.log('=== PHISHING SEND SUCCESS ===');
+    console.log('Result:', result);
+
+    return new Response(
+      JSON.stringify(result),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('=== PHISHING SEND ERROR ===', error);
+    return new Response(
+      JSON.stringify({
+        error: error.message || 'Send failed'
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+}

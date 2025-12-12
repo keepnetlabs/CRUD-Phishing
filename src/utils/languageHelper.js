@@ -2,62 +2,75 @@
  * Language Helper - Get language resourceId from code
  */
 
-// Sample languages data - Update this with your actual languages endpoint data
-const languages = {
-  data: [
-    { id: '2b1583d7-d76b-45ac-b5a5-fe58d00c70ff', code: 'en', isoCode: 'en-US', name: 'English' },
-    { id: 'da5c3e9f-8c4a-4b2e-9d1f-7c8e5a6b9c2d', code: 'tr', isoCode: 'tr-TR', name: 'Turkish' },
-    { id: '5f9e2c3a-1b4d-4e6f-8g9h-0i1j2k3l4m5n', code: 'de', isoCode: 'de-DE', name: 'German' },
-    { id: '3a4b5c6d-7e8f-9g0h-1i2j-3k4l5m6n7o8p', code: 'fr', isoCode: 'fr-FR', name: 'French' },
-    { id: '8q9r0s1t-2u3v-4w5x-6y7z-8a9b0c1d2e3f', code: 'es', isoCode: 'es-ES', name: 'Spanish' }
-  ]
-};
+import languages from '../languages.js';
 
 /**
  * Get language resourceId from language code
  *
- * @param {string} languageCode - Language code (en, tr, de, etc.) or UUID
- * @returns {string} - Language resourceId (UUID)
+ * @param {string} languageCode - Language code (en, tr, fr, etc.) or isoCode (en-GB, tr-TR, etc.)
+ * @returns {string} - Language resourceId
  */
 export function getLanguageResourceId(languageCode) {
   try {
     if (!languageCode) {
       // Default fallback - English
+      const defaultLang = languages.find(lang => lang.isoCode === 'en-GB');
+      const defaultResourceId = defaultLang?.resourceId || '862249c19aad';
       console.log('[getLanguageResourceId] No language code provided, using English default');
-      return '2b1583d7-d76b-45ac-b5a5-fe58d00c70ff';
+      return defaultResourceId;
     }
 
-    // First try: ID matching (if already a resolved UUID)
-    const languageById = languages.data.find(
-      (lang) => lang.id?.toLowerCase() === languageCode.toLowerCase()
+    // Normalize code to lowercase
+    const normalizedCode = languageCode.toLowerCase();
+
+    // Try to find by resourceId first (if already resolved)
+    const languageByResourceId = languages.find(
+      (lang) => lang.resourceId?.toLowerCase() === normalizedCode
     );
 
-    if (languageById?.id) {
-      console.log(`[getLanguageResourceId] Found language by ID: ${languageById.id}`);
-      return languageById.id;
+    if (languageByResourceId?.resourceId) {
+      console.log(`[getLanguageResourceId] Found language by resourceId: ${languageByResourceId.resourceId}`);
+      return languageByResourceId.resourceId;
     }
 
-    // Second try: Normalize code and match by code, isoCode, or name
-    const normalizedCode = (languageCode || 'en').toLowerCase();
-
-    const language = languages.data.find(
-      (lang) =>
-        lang.code?.toLowerCase() === normalizedCode ||
-        lang.isoCode?.toLowerCase() === normalizedCode ||
-        lang.name?.toLowerCase() === normalizedCode
+    // Try to find by isoCode (en-GB, tr-TR, etc.)
+    const languageByIsoCode = languages.find(
+      (lang) => lang.isoCode?.toLowerCase() === normalizedCode
     );
 
-    if (language?.id) {
-      console.log(`[getLanguageResourceId] Found language: ${language.name} (${language.code}) - ID: ${language.id}`);
-      return language.id;
+    if (languageByIsoCode?.resourceId) {
+      console.log(`[getLanguageResourceId] Found language by isoCode: ${languageByIsoCode.name} (${languageByIsoCode.isoCode}) - resourceId: ${languageByIsoCode.resourceId}`);
+      return languageByIsoCode.resourceId;
+    }
+
+    // Try to find by description/code (EN, TR, FR, etc.)
+    const languageByCode = languages.find(
+      (lang) => lang.description?.toLowerCase() === normalizedCode || lang.code?.toLowerCase() === normalizedCode
+    );
+
+    if (languageByCode?.resourceId) {
+      console.log(`[getLanguageResourceId] Found language by code: ${languageByCode.name} - resourceId: ${languageByCode.resourceId}`);
+      return languageByCode.resourceId;
+    }
+
+    // Try to find by name (English, Turkish, etc.)
+    const languageByName = languages.find(
+      (lang) => lang.name?.toLowerCase() === normalizedCode
+    );
+
+    if (languageByName?.resourceId) {
+      console.log(`[getLanguageResourceId] Found language by name: ${languageByName.name} - resourceId: ${languageByName.resourceId}`);
+      return languageByName.resourceId;
     }
 
     // Default fallback - English
+    const defaultLang = languages.find(lang => lang.isoCode === 'en-GB');
+    const defaultResourceId = defaultLang?.resourceId || '862249c19aad';
     console.warn(`[getLanguageResourceId] Language code '${languageCode}' not found, using English default`);
-    return '2b1583d7-d76b-45ac-b5a5-fe58d00c70ff';
+    return defaultResourceId;
 
   } catch (error) {
     console.error('[getLanguageResourceId] Error:', error.message);
-    return '2b1583d7-d76b-45ac-b5a5-fe58d00c70ff';
+    return '862249c19aad';
   }
 }

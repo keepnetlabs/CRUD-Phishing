@@ -14,7 +14,7 @@ import { methodTypeItems } from '../utils/constants.js';
  * @param {Object} params.phishingData - Phishing campaign data
  * @returns {Promise<Object>} - Campaign details
  */
-export async function submitPhishing({ accessToken, url, baseUrl, phishingData }) {
+export async function submitPhishing({ accessToken, url, baseUrl, phishingData, companyId: bodyCompanyId }) {
   try {
     console.log('[submitPhishing] Starting phishing campaign submission');
     console.log('[submitPhishing] Campaign name:', phishingData.name);
@@ -23,7 +23,7 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData }
     const tokenPayload = parseJWT(accessToken);
     console.log('[submitPhishing] Token payload:', JSON.stringify(tokenPayload, null, 2));
 
-    const companyId = getCompanyIdFromToken(tokenPayload);
+    const companyId = bodyCompanyId || phishingData?.companyId || getCompanyIdFromToken(tokenPayload);
     console.log('[submitPhishing] Company ID:', companyId);
 
     if (!companyId) {

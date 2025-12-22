@@ -75,6 +75,7 @@ export async function submitPhishingEmailTemplate({ accessToken, companyId, url,
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[submitPhishingEmailTemplate] API Error:', errorData);
       throw new Error(
         `API error: ${response.status} - ${errorData.message || 'Unknown error'}`
       );

@@ -69,6 +69,7 @@ export async function submitPhishingScenario({
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[submitPhishingScenario] API Error:', errorData);
       throw new Error(
         `API error: ${response.status} - ${errorData.message || 'Unknown error'}`
       );
@@ -79,9 +80,9 @@ export async function submitPhishingScenario({
     console.log('[submitPhishingScenario] Scenario created successfully');
 
     // Extract from nested data structure
-    const scenarioData = result.data?.searchPsScenario || result.searchPsScenario || result;
+    const createdScenarioData = result.data?.searchPsScenario || result.searchPsScenario || result;
     const resourceId = result.data?.resourceId || result.resourceId;
-    const id = scenarioData?.id;
+    const id = createdScenarioData?.id;
 
     console.log('[submitPhishingScenario] Scenario ResourceId:', resourceId);
     console.log('[submitPhishingScenario] Scenario ID:', id);
@@ -90,7 +91,7 @@ export async function submitPhishingScenario({
       success: true,
       resourceId: resourceId,
       id: id,
-      name: scenarioData?.name || result.name,
+      name: createdScenarioData?.name || result.name,
       message: 'Phishing scenario successfully created'
     };
 

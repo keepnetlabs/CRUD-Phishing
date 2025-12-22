@@ -93,7 +93,6 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData, 
     }
 
     console.log('[submitPhishing] Campaign submission completed');
-
     return {
       success: true,
       templateResourceId: templateResult.resourceId,

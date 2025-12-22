@@ -13,6 +13,9 @@ import { parseJWT, getCompanyIdFromToken } from '../utils/jwtHelper.js';
  * @param {string} params.scenarioResourceId - Phishing scenario resource ID
  * @param {string} params.targetUserResourceId - Target user resource ID
  * @param {string} params.name - Campaign name (scenario name)
+ * @param {string} [params.trainingId] - Training ID (UUID) - optional
+ * @param {string[]} [params.trainingLanguageIds] - Training language IDs (UUID array) - optional
+ * @param {string} [params.targetGroupResourceId] - Target group resource ID - optional (if provided, skips group creation)
  * @returns {Promise<Object>} - Send result
  */
 export async function sendPhishing({
@@ -20,13 +23,18 @@ export async function sendPhishing({
   url,
   scenarioResourceId,
   targetUserResourceId,
-  name
+  name,
+  trainingId,
+  trainingLanguageIds,
+  targetGroupResourceId
 }) {
   try {
     console.log('[sendPhishing] Starting phishing campaign distribution');
     console.log('[sendPhishing] Scenario Resource ID:', scenarioResourceId);
     console.log('[sendPhishing] Target User Resource ID:', targetUserResourceId);
     console.log('[sendPhishing] Campaign name:', name);
+    console.log('[sendPhishing] Training ID:', trainingId || 'not provided');
+    console.log('[sendPhishing] Training Language IDs:', trainingLanguageIds || 'not provided');
 
     // Parse JWT and extract company ID
     const tokenPayload = parseJWT(accessToken);
@@ -38,26 +46,31 @@ export async function sendPhishing({
 
     console.log('[sendPhishing] Company ID:', companyId);
 
-    // STEP 1: Search for target group
-    const groupName = `Agentic Ally Group - ${targetUserResourceId}`;
-    console.log('[STEP 1] Searching for target group:', groupName);
+    // STEP 1 & 2: Get or create target group (skip if targetGroupResourceId is provided)
+    let finalTargetGroupResourceId = targetGroupResourceId;
 
-    const searchResult = await searchTargetGroups(url, accessToken, companyId, groupName);
-    let targetGroupResourceId = null;
+    if (!finalTargetGroupResourceId) {
+      const groupName = `Agentic Ally Group - ${targetUserResourceId}`;
+      console.log('[STEP 1] Searching for target group:', groupName);
 
-    if (searchResult.data?.results && searchResult.data.results.length > 0) {
-      targetGroupResourceId = searchResult.data.results[0].resourceId;
-      console.log('[STEP 1] ✓ Target group found:', targetGroupResourceId);
+      const searchResult = await searchTargetGroups(url, accessToken, companyId, groupName);
+
+      if (searchResult.data?.results && searchResult.data.results.length > 0) {
+        finalTargetGroupResourceId = searchResult.data.results[0].resourceId;
+        console.log('[STEP 1] ✓ Target group found:', finalTargetGroupResourceId);
+      } else {
+        // STEP 2: Create target group if not found
+        console.log('[STEP 2] Target group not found, creating new one...');
+        const createResult = await createTargetGroup(url, accessToken, companyId, groupName);
+        finalTargetGroupResourceId = createResult.data?.resourceId;
+        console.log('[STEP 2] ✓ Target group created:', finalTargetGroupResourceId);
+      }
+
+      if (!finalTargetGroupResourceId) {
+        throw new Error('Failed to get target group resource ID');
+      }
     } else {
-      // STEP 2: Create target group if not found
-      console.log('[STEP 2] Target group not found, creating new one...');
-      const createResult = await createTargetGroup(url, accessToken, companyId, groupName);
-      targetGroupResourceId = createResult.data?.resourceId;
-      console.log('[STEP 2] ✓ Target group created:', targetGroupResourceId);
-    }
-
-    if (!targetGroupResourceId) {
-      throw new Error('Failed to get target group resource ID');
+      console.log('[STEP 1-2] Skipped: Using provided targetGroupResourceId:', finalTargetGroupResourceId);
     }
 
     // STEP 3: Get default email delivery settings
@@ -73,18 +86,32 @@ export async function sendPhishing({
     // STEP 4: Send campaign to the target group
     console.log('[STEP 4] Sending campaign to target group...');
 
+    // Build phishing scenario object
+    const phishingScenario = {
+      phishingScenarioResourceId: scenarioResourceId,
+      trainingId: trainingId || '',
+      trainingLanguageIds: trainingLanguageIds || [],
+      enrollmentReminder: null,
+      awardCertificate: false,
+      certificateConfigSendType: 'SendOnFirstAttempt',
+      enrollmentSendTypeId: '1'
+    };
+
+    // Add static training redirect page if trainingId is provided
+    if (trainingId) {
+      phishingScenario.trainingRedirectPage = {
+        informationMessage: 'Because you failed the phishing simulation test, you have been assigned to a training selected by the company admin',
+        redirectMessage: 'Please start the training and complete the training as soon as possible',
+        startButtonLabel: 'Start Training'
+      };
+    }
+
     const payload = {
-      phishingScenarios: [
-        {
-          phishingScenarioResourceId: scenarioResourceId,
-          trainingId: '',
-          trainingLanguageIds: []
-        }
-      ],
+      phishingScenarios: [phishingScenario],
       name: name || 'Phishing Campaign',
       scheduleTypeId: '1',
       duration: 365,
-      targetGroupResourceIds: [targetGroupResourceId],
+      targetGroupResourceIds: [finalTargetGroupResourceId],
       distributionTypeId: '1',
       distributionDelayEvery: 20,
       distributionDelayTimeTypeId: '1',
@@ -117,6 +144,7 @@ export async function sendPhishing({
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('[sendPhishing] API Error:', errorData);
       throw new Error(
         `API error: ${response.status} - ${errorData.message || 'Unknown error'}`
       );
@@ -133,8 +161,7 @@ export async function sendPhishing({
       campaignId: result.data?.resourceId || result.resourceId,
       campaignName: name,
       targetUserResourceId: targetUserResourceId,
-      targetGroupResourceId: targetGroupResourceId,
-      groupName: groupName,
+      targetGroupResourceId: finalTargetGroupResourceId,
       distributionStarted: true
     };
 

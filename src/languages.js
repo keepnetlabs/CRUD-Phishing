@@ -1,4 +1,4 @@
-[
+const languages = [
     {
         "resourceId": "862249c19aad",
         "genericCodeTypeId": 21,
@@ -923,4 +923,6 @@
         "isoCode": "sr-BA",
         "isoFriendlyName": "Serbian (Bosnia and Herzegovina)"
     }
-]
+];
+
+export default languages;

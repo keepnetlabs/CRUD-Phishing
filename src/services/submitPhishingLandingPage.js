@@ -65,7 +65,10 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
     console.log('[submitPhishingLandingPage] Full payload:', JSON.stringify(payload, null, 2));
 
     // Step 4: Send to API
-    const response = await fetch(`${url}/api/phishing-simulator/landing-pages`, {
+    const apiUrl = `${url}/api/phishing-simulator/landing-page-template`;
+    console.log('[submitPhishingLandingPage] API URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,9 +80,25 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorMessage = `Unknown error`;
+      let errorDetails = {};
+      
+      try {
+        const errorData = await response.json();
+        errorDetails = errorData;
+        errorMessage = errorData.message || errorData.error || JSON.stringify(errorData);
+        console.error('[submitPhishingLandingPage] API Error Response:', JSON.stringify(errorData, null, 2));
+      } catch (e) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[submitPhishingLandingPage] API Error Text:', errorText);
+        errorMessage = errorText || errorMessage;
+      }
+      
+      console.error('[submitPhishingLandingPage] API Error Status:', response.status);
+      console.error('[submitPhishingLandingPage] API Error Details:', errorDetails);
+      
       throw new Error(
-        `API error: ${response.status} - ${errorData.message || 'Unknown error'}`
+        `API error: ${response.status} - ${errorMessage}`
       );
     }
 
@@ -88,9 +107,9 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
     console.log('[submitPhishingLandingPage] Landing page created successfully');
 
     // Extract from nested data structure
-    const landingPageData = result.data?.landingPageTemplate || result.searchPsLandingPage || result;
+    const createdLandingPageData = result.data?.landingPageTemplate || result.searchPsLandingPage || result;
     const resourceId = result.data?.resourceId || result.resourceId;
-    const id = landingPageData?.id;
+    const id = createdLandingPageData?.id;
 
     console.log('[submitPhishingLandingPage] Landing page ResourceId:', resourceId);
     console.log('[submitPhishingLandingPage] Landing page ID:', id);
@@ -99,7 +118,7 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
       success: true,
       resourceId: resourceId,
       id: id,
-      name: landingPageData?.name || result.name,
+      name: createdLandingPageData?.name || result.name,
       message: 'Landing page successfully created'
     };
 

@@ -29,7 +29,10 @@ import { sendPhishing } from './services/sendPhishing.js';
  *   "url": "API base URL",
  *   "scenarioResourceId": "Phishing scenario resource ID",
  *   "targetUserResourceId": "Target user resource ID",
- *   "name": "Campaign name"
+ *   "name": "Campaign name",
+ *   "trainingId": "Training ID (UUID) - optional",
+ *   "sendTrainingLanguageId": "Training language ID (UUID) - optional, single ID",
+ *   "trainingLanguageIds": ["Training language IDs (UUID array) - optional"]
  * }
  *
  * ALL LOGIC in services/ directory!
@@ -153,14 +156,32 @@ async function handleSubmit(request) {
 async function handleSend(request) {
   try {
     const body = await request.json();
-    const { accessToken, url, scenarioResourceId, targetUserResourceId, name } = body;
+    const { 
+      accessToken, 
+      apiUrl,           // payload'dan gelen apiUrl
+      url,              // backward compatibility için
+      companyId,        // payload'dan gelen companyId (optional)
+      phishingId,       // payload'dan gelen phishingId (scenarioResourceId)
+      scenarioResourceId, // backward compatibility için
+      languageId,       // payload'dan gelen (ignored)
+      targetUserResourceId,
+      targetGroupResourceId,  // payload'dan gelen (optional)
+      name,
+      trainingId,
+      sendTrainingLanguageId,
+      trainingLanguageIds
+    } = body;
+
+    // Map payload fields to expected fields
+    const finalUrl = apiUrl || url;
+    const finalScenarioResourceId = phishingId || scenarioResourceId;
 
     // Validate required fields
-    if (!accessToken || !url || !scenarioResourceId || !targetUserResourceId || !name) {
+    if (!accessToken || !finalUrl || !finalScenarioResourceId || !targetUserResourceId || !name) {
       return new Response(
         JSON.stringify({
           error: 'Missing required fields',
-          required: ['accessToken', 'url', 'scenarioResourceId', 'targetUserResourceId', 'name']
+          required: ['accessToken', 'apiUrl (or url)', 'phishingId (or scenarioResourceId)', 'targetUserResourceId', 'name']
         }),
         {
           status: 400,
@@ -170,17 +191,30 @@ async function handleSend(request) {
     }
 
     console.log('=== PHISHING SEND ACTION ===');
-    console.log('Scenario Resource ID:', scenarioResourceId);
+    console.log('API URL:', finalUrl);
+    console.log('Company ID:', companyId || 'will be extracted from token');
+    console.log('Scenario Resource ID (phishingId):', finalScenarioResourceId);
     console.log('Target User Resource ID:', targetUserResourceId);
     console.log('Campaign name:', name);
+    console.log('Training ID:', trainingId || 'not provided');
+    console.log('Training Language IDs:', trainingLanguageIds || sendTrainingLanguageId || 'not provided');
+    console.log('Target Group Resource ID:', targetGroupResourceId || 'will be created');
+
+    // Handle both sendTrainingLanguageId (single) and trainingLanguageIds (array)
+    // If sendTrainingLanguageId is provided, convert it to array
+    const finalTrainingLanguageIds = trainingLanguageIds || 
+      (sendTrainingLanguageId ? [sendTrainingLanguageId] : undefined);
 
     // Call sendPhishing() function
     const result = await sendPhishing({
       accessToken,
-      url,
-      scenarioResourceId,
+      url: finalUrl,
+      scenarioResourceId: finalScenarioResourceId,
       targetUserResourceId,
-      name
+      name,
+      trainingId,
+      trainingLanguageIds: finalTrainingLanguageIds,
+      targetGroupResourceId
     });
 
     console.log('=== PHISHING SEND SUCCESS ===');

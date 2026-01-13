@@ -9,9 +9,10 @@ import { getLanguageResourceId } from '../utils/languageHelper.js';
  * @param {string} params.companyId - Company resource ID
  * @param {string} params.url - API base URL
  * @param {Object} params.templateData - Email template data
+ * @param {string} [params.apiPrefix='phishing-simulator'] - API prefix (phishing-simulator or quishing-simulator)
  * @returns {Promise<Object>} - Created template details
  */
-export async function submitPhishingEmailTemplate({ accessToken, companyId, url, templateData }) {
+export async function submitPhishingEmailTemplate({ accessToken, companyId, url, templateData, apiPrefix = 'phishing-simulator' }) {
   try {
     console.log('[submitPhishingEmailTemplate] Starting email template creation');
     console.log('[submitPhishingEmailTemplate] Template name:', templateData.name);
@@ -63,7 +64,7 @@ export async function submitPhishingEmailTemplate({ accessToken, companyId, url,
     }
 
     // Step 5: Send to API
-    const response = await fetch(`${url}/api/phishing-simulator/email-templates`, {
+    const response = await fetch(`${url}/api/${apiPrefix}/email-templates`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,

@@ -101,7 +101,7 @@ export default {
 async function handleSubmit(request) {
   try {
     const body = await request.json();
-    const { accessToken, url, baseUrl, phishingData } = body;
+    const { accessToken, url, baseUrl, phishingData, companyId } = body;
 
     // Validate required fields
     if (!accessToken || !url || !phishingData) {
@@ -119,13 +119,17 @@ async function handleSubmit(request) {
 
     console.log('=== PHISHING SUBMIT ACTION ===');
     console.log('Campaign name:', phishingData.name);
+    if (companyId) {
+      console.log('Company ID provided in payload:', companyId);
+    }
 
     // Call submitPhishing() function
     const result = await submitPhishing({
       accessToken,
       url,
       baseUrl,
-      phishingData
+      phishingData,
+      companyId
     });
 
     console.log('=== PHISHING SUBMIT SUCCESS ===');
@@ -169,7 +173,8 @@ async function handleSend(request) {
       name,
       trainingId,
       sendTrainingLanguageId,
-      trainingLanguageIds
+      trainingLanguageIds,
+      isQuishing        // payload'dan gelen (optional)
     } = body;
 
     // Map payload fields to expected fields
@@ -177,11 +182,20 @@ async function handleSend(request) {
     const finalScenarioResourceId = phishingId || scenarioResourceId;
 
     // Validate required fields
-    if (!accessToken || !finalUrl || !finalScenarioResourceId || !targetUserResourceId || !name) {
+    const missingFields = [];
+    if (!accessToken) missingFields.push('accessToken');
+    if (!finalUrl) missingFields.push('apiUrl (or url)');
+    if (!finalScenarioResourceId) missingFields.push('phishingId (or scenarioResourceId)');
+    // Either targetUserResourceId or targetGroupResourceId is required
+    if (!targetUserResourceId && !targetGroupResourceId) missingFields.push('targetUserResourceId (or targetGroupResourceId)');
+    if (!name) missingFields.push('name');
+
+    if (missingFields.length > 0) {
       return new Response(
         JSON.stringify({
           error: 'Missing required fields',
-          required: ['accessToken', 'apiUrl (or url)', 'phishingId (or scenarioResourceId)', 'targetUserResourceId', 'name']
+          missing: missingFields,
+          required: ['accessToken', 'apiUrl (or url)', 'phishingId (or scenarioResourceId)', 'targetUserResourceId (or targetGroupResourceId)', 'name']
         }),
         {
           status: 400,
@@ -205,16 +219,22 @@ async function handleSend(request) {
     const finalTrainingLanguageIds = trainingLanguageIds || 
       (sendTrainingLanguageId ? [sendTrainingLanguageId] : undefined);
 
+    // Determine API prefix based on isQuishing flag
+    const apiPrefix = isQuishing ? 'quishing-simulator' : 'phishing-simulator';
+    console.log('API Prefix:', apiPrefix, '(isQuishing:', isQuishing || false + ')');
+
     // Call sendPhishing() function
     const result = await sendPhishing({
       accessToken,
       url: finalUrl,
       scenarioResourceId: finalScenarioResourceId,
+      companyId,
       targetUserResourceId,
       name,
       trainingId,
       trainingLanguageIds: finalTrainingLanguageIds,
-      targetGroupResourceId
+      targetGroupResourceId,
+      apiPrefix
     });
 
     console.log('=== PHISHING SEND SUCCESS ===');

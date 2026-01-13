@@ -30,12 +30,18 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData, 
       throw new Error('Unable to extract company ID from token');
     }
 
+    // Determine API prefix based on isQuishing flag
+    const isQuishing = phishingData.isQuishing || false;
+    const apiPrefix = isQuishing ? 'quishing-simulator' : 'phishing-simulator';
+    console.log('[submitPhishing] Using API prefix:', apiPrefix, '(isQuishing:', isQuishing + ')');
+
     // Submit email template
     const templateResult = await submitPhishingEmailTemplate({
       accessToken,
       companyId,
       url,
-      templateData: phishingData
+      templateData: phishingData,
+      apiPrefix
     });
     console.log('[submitPhishing] Email template created:', {
       resourceId: templateResult.resourceId,
@@ -58,7 +64,8 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData, 
         accessToken,
         companyId,
         url,
-        landingPageData
+        landingPageData,
+        apiPrefix
       });
       console.log('[submitPhishing] Landing page created:', {
         resourceId: landingPageResult.resourceId,
@@ -84,7 +91,8 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData, 
           templateName: templateResult.name,
           templateDescription: templateResult.description,
           methodTypeId: methodTypeId
-        }
+        },
+        apiPrefix
       });
       console.log('[submitPhishing] Scenario created:', {
         resourceId: scenarioResult.resourceId,

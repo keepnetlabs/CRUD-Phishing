@@ -9,9 +9,10 @@ import { difficultyTypeItems, methodTypeItems } from '../utils/constants.js';
  * @param {string} params.companyId - Company resource ID
  * @param {string} params.url - API base URL
  * @param {Object} params.landingPageData - Landing page data with full configuration
+ * @param {string} [params.apiPrefix='phishing-simulator'] - API prefix (phishing-simulator or quishing-simulator)
  * @returns {Promise<Object>} - Created landing page details
  */
-export async function submitPhishingLandingPage({ accessToken, companyId, url, landingPageData }) {
+export async function submitPhishingLandingPage({ accessToken, companyId, url, landingPageData, apiPrefix = 'phishing-simulator' }) {
   try {
     console.log('[submitPhishingLandingPage] Starting landing page creation');
     console.log('[submitPhishingLandingPage] Pages count:', landingPageData.pages?.length || 0);
@@ -65,7 +66,7 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
     console.log('[submitPhishingLandingPage] Full payload:', JSON.stringify(payload, null, 2));
 
     // Step 4: Send to API
-    const apiUrl = `${url}/api/phishing-simulator/landing-page-template`;
+    const apiUrl = `${url}/api/${apiPrefix}/landing-page-template`;
     console.log('[submitPhishingLandingPage] API URL:', apiUrl);
     
     const response = await fetch(apiUrl, {

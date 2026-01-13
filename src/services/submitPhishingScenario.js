@@ -8,6 +8,7 @@
  * @param {number} params.templateId - Email template ID (numeric)
  * @param {number} params.landingPageId - Landing page template ID (numeric)
  * @param {Object} params.scenarioData - Scenario metadata
+ * @param {string} [params.apiPrefix='phishing-simulator'] - API prefix (phishing-simulator or quishing-simulator)
  * @returns {Promise<Object>} - Created scenario details
  */
 export async function submitPhishingScenario({
@@ -16,7 +17,8 @@ export async function submitPhishingScenario({
   url,
   templateId,
   landingPageId,
-  scenarioData
+  scenarioData,
+  apiPrefix = 'phishing-simulator'
 }) {
   try {
     console.log('[submitPhishingScenario] Starting scenario creation');
@@ -56,7 +58,7 @@ export async function submitPhishingScenario({
     console.log('[submitPhishingScenario] Full payload:', JSON.stringify(payload, null, 2));
 
     // Step 2: Send to API
-    const response = await fetch(`${url}/api/phishing-simulator/phishing-scenario`, {
+    const response = await fetch(`${url}/api/${apiPrefix}/phishing-scenario`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

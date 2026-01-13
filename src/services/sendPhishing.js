@@ -16,6 +16,7 @@ import { parseJWT, getCompanyIdFromToken } from '../utils/jwtHelper.js';
  * @param {string} [params.trainingId] - Training ID (UUID) - optional
  * @param {string[]} [params.trainingLanguageIds] - Training language IDs (UUID array) - optional
  * @param {string} [params.targetGroupResourceId] - Target group resource ID - optional (if provided, skips group creation)
+ * @param {string} [params.apiPrefix='phishing-simulator'] - API prefix (phishing-simulator or quishing-simulator)
  * @returns {Promise<Object>} - Send result
  */
 export async function sendPhishing({
@@ -26,7 +27,9 @@ export async function sendPhishing({
   name,
   trainingId,
   trainingLanguageIds,
-  targetGroupResourceId
+  targetGroupResourceId,
+  apiPrefix = 'phishing-simulator',
+  companyId: payloadCompanyId
 }) {
   try {
     console.log('[sendPhishing] Starting phishing campaign distribution');
@@ -36,15 +39,20 @@ export async function sendPhishing({
     console.log('[sendPhishing] Training ID:', trainingId || 'not provided');
     console.log('[sendPhishing] Training Language IDs:', trainingLanguageIds || 'not provided');
 
-    // Parse JWT and extract company ID
+    // Parse JWT and resolve company ID (prefer payload override)
     const tokenPayload = parseJWT(accessToken);
-    const companyId = getCompanyIdFromToken(tokenPayload);
+    const tokenCompanyId = getCompanyIdFromToken(tokenPayload);
+    const finalCompanyId = payloadCompanyId || tokenCompanyId;
 
-    if (!companyId) {
-      throw new Error('Unable to extract company ID from token');
+    if (!finalCompanyId) {
+      throw new Error('Unable to determine company ID from payload or token');
     }
 
-    console.log('[sendPhishing] Company ID:', companyId);
+    console.log(
+      '[sendPhishing] Company ID:',
+      finalCompanyId,
+      payloadCompanyId ? '(from payload)' : '(from token)'
+    );
 
     // STEP 1 & 2: Get or create target group (skip if targetGroupResourceId is provided)
     let finalTargetGroupResourceId = targetGroupResourceId;
@@ -53,7 +61,7 @@ export async function sendPhishing({
       const groupName = `Agentic Ally Group - ${targetUserResourceId}`;
       console.log('[STEP 1] Searching for target group:', groupName);
 
-      const searchResult = await searchTargetGroups(url, accessToken, companyId, groupName);
+      const searchResult = await searchTargetGroups(url, accessToken, finalCompanyId, groupName);
 
       if (searchResult.data?.results && searchResult.data.results.length > 0) {
         finalTargetGroupResourceId = searchResult.data.results[0].resourceId;
@@ -61,9 +69,18 @@ export async function sendPhishing({
       } else {
         // STEP 2: Create target group if not found
         console.log('[STEP 2] Target group not found, creating new one...');
-        const createResult = await createTargetGroup(url, accessToken, companyId, groupName);
+        const createResult = await createTargetGroup(url, accessToken, finalCompanyId, groupName);
         finalTargetGroupResourceId = createResult.data?.resourceId;
         console.log('[STEP 2] ✓ Target group created:', finalTargetGroupResourceId);
+
+        // STEP 2b: Assign user to the newly created target group
+        if (finalTargetGroupResourceId && targetUserResourceId) {
+          try {
+            await assignUserToTargetGroup(url, accessToken, finalCompanyId, targetUserResourceId, finalTargetGroupResourceId);
+          } catch (error) {
+            console.log('[STEP 2b] User assignment failed but continuing:', error.message);
+          }
+        }
       }
 
       if (!finalTargetGroupResourceId) {
@@ -76,12 +93,12 @@ export async function sendPhishing({
     // STEP 3: Get default email delivery settings
     console.log('[STEP 3] Fetching default email delivery settings...');
 
-    const defaultSettingsResult = await getDefaultEmailDeliverySetting(url, accessToken, companyId);
+    const defaultSettingsResult = await getDefaultEmailDeliverySetting(url, accessToken, finalCompanyId, apiPrefix);
     const emailDeliverySettingType = defaultSettingsResult.data?.type || 1;
-    const smtpSettingResourceId = defaultSettingsResult.data?.resourceId || '';
+    const settingResourceId = defaultSettingsResult.data?.resourceId || '';
     console.log('[STEP 3] ✓ Default email delivery settings retrieved');
     console.log('  - emailDeliverySettingType:', emailDeliverySettingType);
-    console.log('  - smtpSettingResourceId:', smtpSettingResourceId);
+    console.log('  - settingResourceId:', settingResourceId);
 
     // STEP 4: Send campaign to the target group
     console.log('[STEP 4] Sending campaign to target group...');
@@ -123,21 +140,27 @@ export async function sendPhishing({
       sendRandomlyUsers: false,
       sendRandomlyUsersCount: '20',
       sendRandomlyUsersCalculateTypeId: '1',
-      emailDeliverySettingType: emailDeliverySettingType,
-      smtpSettingResourceId: smtpSettingResourceId
+      emailDeliverySettingType: emailDeliverySettingType
     };
+
+    // Add email setting resource ID based on type
+    if (emailDeliverySettingType === 2) {
+      payload.directEmailSettingResourceId = settingResourceId;
+    } else {
+      payload.smtpSettingResourceId = settingResourceId;
+    }
 
     console.log('[sendPhishing] Campaign payload prepared');
     console.log('[sendPhishing] Full payload:', JSON.stringify(payload, null, 2));
 
     // Send to API
-    const response = await fetch(`${url}/api/phishing-simulator/phishing-campaign`, {
+    const response = await fetch(`${url}/api/${apiPrefix}/phishing-campaign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
         'X-IR-API-KEY': 'apikey',
-        'X-IR-COMPANY-ID': companyId
+        'X-IR-COMPANY-ID': finalCompanyId
       },
       body: JSON.stringify(payload)
     });
@@ -268,13 +291,68 @@ async function createTargetGroup(apiUrl, accessToken, companyId, groupName) {
 }
 
 /**
+ * Assign user to target group
+ */
+async function assignUserToTargetGroup(apiUrl, accessToken, companyId, targetUserResourceId, targetGroupResourceId) {
+  try {
+    const payload = {
+      targetUserResourceIds: [targetUserResourceId],
+      selectAll: false,
+      filter: {
+        Condition: 'AND',
+        SearchInputTextValue: '',
+        FilterGroups: [
+          {
+            Condition: 'AND',
+            FilterItems: [],
+            FilterGroups: []
+          },
+          {
+            Condition: 'OR',
+            FilterItems: [],
+            FilterGroups: []
+          }
+        ]
+      },
+      excludedResourceIdList: [],
+      targetGroupResourceIds: [targetGroupResourceId]
+    };
+
+    console.log('[assignUserToTargetGroup] Assigning user to target group');
+    console.log('  - User:', targetUserResourceId);
+    console.log('  - Group:', targetGroupResourceId);
+
+    const response = await fetch(`${apiUrl}/api/target-groups/users`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-IR-COMPANY-ID': companyId
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to assign user to target group. Status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('[assignUserToTargetGroup] ✓ User assigned to target group successfully');
+    return result;
+
+  } catch (error) {
+    throw new Error(`User assignment error: ${error.message}`);
+  }
+}
+
+/**
  * Get default email delivery settings
  */
-async function getDefaultEmailDeliverySetting(apiUrl, accessToken, companyId) {
+async function getDefaultEmailDeliverySetting(apiUrl, accessToken, companyId, apiPrefix = 'phishing-simulator') {
   try {
     console.log('[getDefaultEmailDeliverySetting] Fetching default email delivery settings');
 
-    const response = await fetch(`${apiUrl}/api/phishing-simulator/phishing-campaign/default-email-delivery-setting`, {
+    const response = await fetch(`${apiUrl}/api/${apiPrefix}/phishing-campaign/default-email-delivery-setting`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,

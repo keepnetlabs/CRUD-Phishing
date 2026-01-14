@@ -101,7 +101,13 @@ export default {
 async function handleSubmit(request) {
   try {
     const body = await request.json();
-    const { accessToken, url, baseUrl, phishingData, companyId } = body;
+    let { accessToken, url, baseUrl, phishingData, companyId } = body;
+
+    // URL dönüşümü: dash.keepnetlabs.com -> api.keepnetlabs.com
+    if (url && url.includes('dash.keepnetlabs.com')) {
+      url = url.replace('dash.keepnetlabs.com', 'api.keepnetlabs.com');
+      console.log('[API URL] Converted: dash.keepnetlabs.com -> api.keepnetlabs.com');
+    }
 
     // Validate required fields
     if (!accessToken || !url || !phishingData) {
@@ -178,8 +184,14 @@ async function handleSend(request) {
     } = body;
 
     // Map payload fields to expected fields
-    const finalUrl = apiUrl || url;
+    let finalUrl = apiUrl || url;
     const finalScenarioResourceId = phishingId || scenarioResourceId;
+
+    // URL dönüşümü: dash.keepnetlabs.com -> api.keepnetlabs.com
+    if (finalUrl && finalUrl.includes('dash.keepnetlabs.com')) {
+      finalUrl = finalUrl.replace('dash.keepnetlabs.com', 'api.keepnetlabs.com');
+      console.log('[API URL] Converted: dash.keepnetlabs.com -> api.keepnetlabs.com');
+    }
 
     // Validate required fields
     const missingFields = [];

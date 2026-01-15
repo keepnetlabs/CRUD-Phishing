@@ -41,7 +41,9 @@ export async function submitPhishingScenario({
       emailTemplateId: templateId,
       landingPageTemplateId: landingPageId,
       tags: [],
-      roleResourceIds: ["tnn14n1Q2LWK"],
+      roleResourceIds: (!url.includes('test') && !url.includes('localhost')) 
+        ? ["xctakTerFXAC"] 
+        : ["tnn14n1Q2LWK"],
       mfaSenderNumberResourceId: '',
       mfaTextTemplate: 'Your verification code: {MFA_CODE}',
       availableForRequests: [

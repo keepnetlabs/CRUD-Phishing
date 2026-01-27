@@ -81,15 +81,23 @@ export async function submitPhishing({ accessToken, url, baseUrl, phishingData, 
       const methodType = methodTypeItems.find(m => m.text === normalizedMethod);
       const methodTypeId = methodType?.value || '1';
 
+      const templateIdForScenario = templateResult.id || templateResult.resourceId;
+      const scenarioBaseName = templateResult.name || phishingData.name || 'Phishing Scenario';
+      if (!templateIdForScenario) {
+        console.warn('[submitPhishing] templateId missing, using resourceId fallback may be required');
+      }
+
       scenarioResult = await submitPhishingScenario({
         accessToken,
         companyId,
         url,
-        templateId: templateResult.id,
+        templateId: templateIdForScenario,
+        templateResourceId: templateResult.resourceId,
         landingPageId: landingPageResult.id,
+        languageTypeResourceId: landingPageResult.languageTypeResourceId,
         scenarioData: {
-          templateName: templateResult.name,
-          templateDescription: templateResult.description,
+          templateName: scenarioBaseName,
+          templateDescription: templateResult.description || phishingData.description || '',
           methodTypeId: methodTypeId
         },
         apiPrefix

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/cloudflare';
 import { submitPhishing } from './services/submitPhishing.js';
 import { sendPhishing } from './services/sendPhishing.js';
 
@@ -38,63 +39,73 @@ import { sendPhishing } from './services/sendPhishing.js';
  * ALL LOGIC in services/ directory!
  */
 
-export default {
-  async fetch(request) {
-    // Only accept POST requests
-    if (request.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        {
-          status: 405,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Determine route from URL
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    console.log('=== PHISHING WORKER REQUEST ===');
-    console.log('Path:', path);
-
-    try {
-      // SUBMIT action - Create phishing email template, landing page, and scenario
-      if (path === '/submit' || path === '/') {
-        return await handleSubmit(request);
+export default Sentry.withSentry(
+  (env) => {
+    return {
+      dsn: env.SENTRY_DSN,
+      enabled: Boolean(env.SENTRY_DSN),
+      tracesSampleRate: 0
+    };
+  },
+  {
+    async fetch(request, env, ctx) {
+      // Only accept POST requests
+      if (request.method !== 'POST') {
+        return new Response(
+          JSON.stringify({ error: 'Method not allowed' }),
+          {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
       }
 
-      // SEND action - Send phishing scenario to target user
-      if (path === '/send') {
-        return await handleSend(request);
+      // Determine route from URL
+      const url = new URL(request.url);
+      const path = url.pathname;
+
+      console.log('=== PHISHING WORKER REQUEST ===');
+      console.log('Path:', path);
+
+      try {
+        // SUBMIT action - Create phishing email template, landing page, and scenario
+        if (path === '/submit' || path === '/') {
+          return await handleSubmit(request);
+        }
+
+        // SEND action - Send phishing scenario to target user
+        if (path === '/send') {
+          return await handleSend(request);
+        }
+
+        // Unknown path
+        return new Response(
+          JSON.stringify({
+            error: 'Not found',
+            availableEndpoints: ['/submit', '/send']
+          }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+
+      } catch (error) {
+        Sentry.captureException(error);
+        console.error('=== PHISHING WORKER ERROR ===', error);
+        return new Response(
+          JSON.stringify({
+            error: error.message || 'Unknown error occurred'
+          }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
       }
-
-      // Unknown path
-      return new Response(
-        JSON.stringify({
-          error: 'Not found',
-          availableEndpoints: ['/submit', '/send']
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-    } catch (error) {
-      console.error('=== PHISHING WORKER ERROR ===', error);
-      return new Response(
-        JSON.stringify({
-          error: error.message || 'Unknown error occurred'
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
     }
   }
-};
+);
 
 // ===== ROUTE HANDLERS =====
 
@@ -150,6 +161,7 @@ async function handleSubmit(request) {
     );
 
   } catch (error) {
+    Sentry.captureException(error);
     console.error('=== PHISHING SUBMIT ERROR ===', error);
     return new Response(
       JSON.stringify({
@@ -261,6 +273,7 @@ async function handleSend(request) {
     );
 
   } catch (error) {
+    Sentry.captureException(error);
     console.error('=== PHISHING SEND ERROR ===', error);
     return new Response(
       JSON.stringify({

@@ -1,6 +1,7 @@
 name = "crud-phishing-worker"
 main = "src/index.js"
 compatibility_date = "2024-12-19"
+compatibility_flags = ["nodejs_compat"]
 
 [observability]
 [observability.logs]
@@ -9,5 +10,11 @@ head_sampling_rate = 1
 invocation_logs = true
 persist = true
 
+[vars]
+SENTRY_DSN = "https://13e782c514df5171e3b1d5eb847bd412@o466336.ingest.us.sentry.io/4510755854417920"
+
 [env.production]
 name = "crud-phishing-worker-prod"
+
+[env.production.vars]
+SENTRY_DSN = "https://13e782c514df5171e3b1d5eb847bd412@o466336.ingest.us.sentry.io/4510755854417920"

@@ -120,6 +120,7 @@ export async function submitPhishingLandingPage({ accessToken, companyId, url, l
       resourceId: resourceId,
       id: id,
       name: createdLandingPageData?.name || result.name,
+      languageTypeResourceId: languageResourceId,
       message: 'Landing page successfully created'
     };
 

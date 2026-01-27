@@ -16,7 +16,9 @@ export async function submitPhishingScenario({
   companyId,
   url,
   templateId,
+  templateResourceId,
   landingPageId,
+  languageTypeResourceId,
   scenarioData,
   apiPrefix = 'phishing-simulator'
 }) {
@@ -26,7 +28,8 @@ export async function submitPhishingScenario({
     console.log('[submitPhishingScenario] Landing Page ID:', landingPageId);
 
     // Step 1: Build payload with new structure
-    const scenarioName = `${scenarioData.templateName} - Agentic Ally Scenario`;
+    const scenarioNameBase = scenarioData.templateName || 'Phishing Scenario';
+    const scenarioName = `${scenarioNameBase} - Agentic Ally Scenario`;
     const scenarioDescription = scenarioData.templateDescription || '';
 
     console.log('[submitPhishingScenario] Scenario name:', scenarioName);
@@ -38,7 +41,6 @@ export async function submitPhishingScenario({
       categoryId: '2',
       methodTypeId: scenarioData.methodTypeId || '1',
       difficultyTypeId: '1',
-      emailTemplateId: templateId,
       landingPageTemplateId: landingPageId,
       tags: [],
       roleResourceIds: (!url.includes('test') && !url.includes('localhost')) 
@@ -56,11 +58,28 @@ export async function submitPhishingScenario({
       ]
     };
 
+    if (apiPrefix === 'quishing-simulator') {
+      payload.languageTypeResourceId = languageTypeResourceId;
+      payload.templateType = 'Email';
+      payload.templateResourceId = templateResourceId;
+      if (!templateResourceId) {
+        console.warn('[submitPhishingScenario] templateResourceId not provided for quishing scenario');
+      }
+    } else {
+      if (!templateId) {
+        console.warn('[submitPhishingScenario] emailTemplateId missing when not using quishing prefix');
+      }
+      payload.emailTemplateId = templateId;
+    }
+
     console.log('[submitPhishingScenario] Payload prepared');
     console.log('[submitPhishingScenario] Full payload:', JSON.stringify(payload, null, 2));
 
     // Step 2: Send to API
-    const response = await fetch(`${url}/api/${apiPrefix}/phishing-scenario`, {
+    const scenarioPath = apiPrefix === 'quishing-simulator'
+      ? 'quishing-scenario'
+      : 'phishing-scenario';
+    const response = await fetch(`${url}/api/${apiPrefix}/${scenarioPath}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
